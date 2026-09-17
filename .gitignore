@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Env files (real secrets — only .env.example is committed)
+.env
+backend/.env
+
+# Vercel local project link
+backend/.vercel/
+
+# clasp local auth / real script link — contains OAuth tokens + your script ID
+apps-script/.clasp.json
+.clasprc.json
