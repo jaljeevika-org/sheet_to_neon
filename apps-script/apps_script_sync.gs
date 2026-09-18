@@ -12,7 +12,11 @@
  *   1. Project Settings > Script Properties: add SYNC_SECRET with the same
  *      value configured as SYNC_SECRET in Vercel.
  *   2. Run createOnChangeTrigger() once to install the trigger.
- *   3. Run backfillAll() once to push existing rows into Neon.
+ *   3. Run backfillAll() once to start the initial load of existing rows.
+ *      It paces itself to Voyage AI's free-tier rate limit and resumes
+ *      itself automatically every 10 minutes until done -- no need to
+ *      re-run it manually, just leave it (check progress via
+ *      `SELECT count(*) FROM reports;` in Neon).
  */
 
 var SHEET_ID = '1JvG-freIMAxkU5m3sI5kKZJJGBQg3rH8CdxBKjLtQ94';
@@ -20,8 +24,13 @@ var SHEET_NAME = 'Daily Reports';
 var SYNC_ENDPOINT = 'https://backend-g1-3c69.vercel.app/api/sync';
 var SYNC_SECRET_PROPERTY = 'SYNC_SECRET';
 var LAST_SYNCED_ROW_PROPERTY = 'lastSyncedRow';
-var BATCH_SIZE = 200; // rows per HTTP request
+var BATCH_SIZE = 50; // rows per HTTP request -- kept small so one batch's
+                      // worth of embeddings stays comfortably under Voyage
+                      // AI's free-tier 10K-tokens/minute cap
 var LOCK_TIMEOUT_MS = 30 * 1000;
+var BATCH_DELAY_MS = 21 * 1000; // >20s between batches, to stay under
+                                 // Voyage AI's free-tier 3 requests/minute cap
+var BACKFILL_TRIGGER_HANDLER = 'continueBackfill';
 
 var HEADER_ROW = 1;
 
@@ -79,6 +88,8 @@ function syncNewRows_() {
 
   var colIndex = getColumnIndexMap_(sheet);
   var startRow = lastSyncedRow + 1;
+  var startedAt = Date.now();
+  var MAX_RUNTIME_MS = 5 * 60 * 1000; // stop well before Apps Script's ~6-minute execution cap
 
   while (startRow <= lastRow) {
     var endRow = Math.min(startRow + BATCH_SIZE - 1, lastRow);
@@ -95,6 +106,15 @@ function syncNewRows_() {
 
     props.setProperty(LAST_SYNCED_ROW_PROPERTY, String(endRow));
     startRow = endRow + 1;
+
+    if (startRow > lastRow) break; // done, no need to sleep or check runtime
+
+    if (Date.now() - startedAt > MAX_RUNTIME_MS) {
+      console.log('Approaching execution time limit; stopping early. Resumes on next run.');
+      break;
+    }
+
+    Utilities.sleep(BATCH_DELAY_MS); // stay under Voyage AI's free-tier 3 requests/minute cap
   }
 }
 
@@ -164,13 +184,48 @@ function sendBatch_(rows) {
 
 // ===== One-off backfill (run manually from the editor) =====
 
+/**
+ * Starts (or restarts from scratch) a full backfill of every existing row.
+ * Resumable by design: a single Apps Script execution can't finish ~7,974
+ * rows within its ~6-minute cap while also respecting Voyage AI's free-tier
+ * rate limit (3 requests/minute), so this installs a time-driven trigger
+ * that re-invokes continueBackfill() every 10 minutes until caught up, then
+ * removes itself.
+ */
 function backfillAll() {
+  PropertiesService.getScriptProperties().setProperty(LAST_SYNCED_ROW_PROPERTY, String(HEADER_ROW));
+  installBackfillTrigger_();
+  continueBackfill();
+}
+
+/** One resumable chunk of the backfill. Safe to run manually too. */
+function continueBackfill() {
   var lock = LockService.getScriptLock();
   lock.waitLock(LOCK_TIMEOUT_MS);
   try {
-    PropertiesService.getScriptProperties().setProperty(LAST_SYNCED_ROW_PROPERTY, String(HEADER_ROW));
     syncNewRows_();
   } finally {
     lock.releaseLock();
   }
+
+  var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+  var lastSyncedRow = Number(PropertiesService.getScriptProperties().getProperty(LAST_SYNCED_ROW_PROPERTY) || HEADER_ROW);
+  if (lastSyncedRow >= sheet.getLastRow()) {
+    console.log('Backfill complete.');
+    removeBackfillTrigger_();
+  }
+}
+
+function installBackfillTrigger_() {
+  removeBackfillTrigger_();
+  ScriptApp.newTrigger(BACKFILL_TRIGGER_HANDLER)
+    .timeBased()
+    .everyMinutes(10)
+    .create();
+}
+
+function removeBackfillTrigger_() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === BACKFILL_TRIGGER_HANDLER) ScriptApp.deleteTrigger(t);
+  });
 }
