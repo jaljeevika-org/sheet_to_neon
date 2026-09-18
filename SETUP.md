@@ -11,16 +11,20 @@ in the dashboards named below.
 - Copy the connection string from Neon's "Connection Details" panel — this
   is `DATABASE_URL`, needed in step 3.
 
-## 2. OpenAI
-- Get an API key from platform.openai.com → `OPENAI_API_KEY`, needed in
-  step 3.
+## 2. Voyage AI (embeddings)
+- Get an API key from dash.voyageai.com → `VOYAGE_API_KEY`, needed in
+  step 3. (Not OpenAI — Anthropic/Claude has no embeddings API of its own
+  and recommends Voyage as the pairing provider. First 200M tokens/month
+  are free, which comfortably covers this project's data volume.)
+- Optional: if you'd rather skip semantic search for now, this step can be
+  skipped entirely — aggregation reports need no embeddings provider at all.
 
 ## 3. Deploy the backend to Vercel
 - New Project → import the GitHub repo (`jaljeevika-org/sheet_to_neon`).
 - **Root Directory: `backend`** (this is what makes the monorepo split work).
 - Environment variables (Vercel dashboard → Settings → Environment Variables):
   - `DATABASE_URL` — from step 1
-  - `OPENAI_API_KEY` — from step 2
+  - `VOYAGE_API_KEY` — from step 2
   - `SYNC_SECRET` — any long random string you generate now (e.g.
     `openssl rand -hex 32`). Reuse the exact same value in step 4.
 - Deploy. Copy the resulting URL, e.g. `https://sheet-to-neon.vercel.app`.

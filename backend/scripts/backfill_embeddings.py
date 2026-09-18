@@ -1,9 +1,9 @@
 """One-off batch job: embed existing rows where description_embedding is
-still NULL (e.g. rows loaded before OPENAI_API_KEY was set, or a sync call
+still NULL (e.g. rows loaded before VOYAGE_API_KEY was set, or a sync call
 that failed partway through). Never re-embeds rows that already have one.
 
 Run locally:
-    DATABASE_URL=... OPENAI_API_KEY=... python scripts/backfill_embeddings.py
+    DATABASE_URL=... VOYAGE_API_KEY=... python scripts/backfill_embeddings.py
 """
 import os
 import sys

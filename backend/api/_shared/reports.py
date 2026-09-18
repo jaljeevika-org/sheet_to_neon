@@ -58,7 +58,7 @@ def get_aggregate_report(conn, start_date=None, end_date=None, state=None, proje
 
 def semantic_search_reports(conn, query_text, limit=10, state=None, project=None,
                              start_date=None, end_date=None):
-    query_embedding = embed_texts([query_text])[0]
+    query_embedding = embed_texts([query_text], input_type="query")[0]
     with conn.cursor() as cur:
         cur.execute(SEMANTIC_SEARCH_SQL, {
             "query_embedding": query_embedding,

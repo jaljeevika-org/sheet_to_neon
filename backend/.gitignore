@@ -1,2 +1,5 @@
 .neon
 .env.local
+
+.vercel
+.env*
