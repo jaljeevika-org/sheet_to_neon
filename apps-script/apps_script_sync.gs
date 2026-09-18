@@ -3,6 +3,11 @@
  * backend via a Vercel endpoint, as rows are appended by the reporting
  * bot's API writes (not manual edits, not a Form).
  *
+ * Opens the sheet by SHEET_ID explicitly (SpreadsheetApp.openById), rather
+ * than assuming this script is container-bound to it — works whether this
+ * project is bound to the sheet or standalone, as long as the account
+ * running it has access to that spreadsheet.
+ *
  * Setup (run once from the Apps Script editor):
  *   1. Project Settings > Script Properties: add SYNC_SECRET with the same
  *      value configured as SYNC_SECRET in Vercel.
@@ -10,6 +15,7 @@
  *   3. Run backfillAll() once to push existing rows into Neon.
  */
 
+var SHEET_ID = '1JvG-freIMAxkU5m3sI5kKZJJGBQg3rH8CdxBKjLtQ94';
 var SHEET_NAME = 'Daily Reports';
 var SYNC_ENDPOINT = 'https://backend-g1-3c69.vercel.app/api/sync';
 var SYNC_SECRET_PROPERTY = 'SYNC_SECRET';
@@ -29,7 +35,7 @@ function createOnChangeTrigger() {
     if (t.getHandlerFunction() === 'onChangeSync') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('onChangeSync')
-    .forSpreadsheet(SpreadsheetApp.getActive())
+    .forSpreadsheet(SpreadsheetApp.openById(SHEET_ID))
     .onChange()
     .create();
 }
@@ -62,7 +68,7 @@ function onChangeSync(e) {
 // ===== Core sync logic =====
 
 function syncNewRows_() {
-  var sheet = SpreadsheetApp.getActive().getSheetByName(SHEET_NAME);
+  var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
   var props = PropertiesService.getScriptProperties();
   var lastRow = sheet.getLastRow();
   var lastSyncedRow = Number(props.getProperty(LAST_SYNCED_ROW_PROPERTY) || HEADER_ROW);
