@@ -13,10 +13,10 @@
  *      value configured as SYNC_SECRET in Vercel.
  *   2. Run createOnChangeTrigger() once to install the trigger.
  *   3. Run backfillAll() once to start the initial load of existing rows.
- *      It paces itself to Voyage AI's free-tier rate limit and resumes
- *      itself automatically every 10 minutes until done -- no need to
- *      re-run it manually, just leave it (check progress via
- *      `SELECT count(*) FROM reports;` in Neon).
+ *      A single execution can't finish ~7,974 rows within Apps Script's own
+ *      ~6-minute execution cap, so it resumes itself automatically every 10
+ *      minutes until done -- no need to re-run it manually, just leave it
+ *      (check progress via `SELECT count(*) FROM reports;` in Neon).
  */
 
 var SHEET_ID = '1JvG-freIMAxkU5m3sI5kKZJJGBQg3rH8CdxBKjLtQ94';
@@ -24,12 +24,9 @@ var SHEET_NAME = 'Daily Reports';
 var SYNC_ENDPOINT = 'https://backend-g1-3c69.vercel.app/api/sync';
 var SYNC_SECRET_PROPERTY = 'SYNC_SECRET';
 var LAST_SYNCED_ROW_PROPERTY = 'lastSyncedRow';
-var BATCH_SIZE = 50; // rows per HTTP request -- kept small so one batch's
-                      // worth of embeddings stays comfortably under Voyage
-                      // AI's free-tier 10K-tokens/minute cap
+var BATCH_SIZE = 200; // rows per HTTP request
 var LOCK_TIMEOUT_MS = 30 * 1000;
-var BATCH_DELAY_MS = 21 * 1000; // >20s between batches, to stay under
-                                 // Voyage AI's free-tier 3 requests/minute cap
+var BATCH_DELAY_MS = 0; // no inter-batch delay needed at OpenAI's default rate limits
 var BACKFILL_TRIGGER_HANDLER = 'continueBackfill';
 
 var HEADER_ROW = 1;
@@ -114,7 +111,7 @@ function syncNewRows_() {
       break;
     }
 
-    Utilities.sleep(BATCH_DELAY_MS); // stay under Voyage AI's free-tier 3 requests/minute cap
+    if (BATCH_DELAY_MS > 0) Utilities.sleep(BATCH_DELAY_MS); // set > 0 if the embeddings provider's rate limit ever requires pacing again
   }
 }
 
@@ -187,8 +184,7 @@ function sendBatch_(rows) {
 /**
  * Starts (or restarts from scratch) a full backfill of every existing row.
  * Resumable by design: a single Apps Script execution can't finish ~7,974
- * rows within its ~6-minute cap while also respecting Voyage AI's free-tier
- * rate limit (3 requests/minute), so this installs a time-driven trigger
+ * rows within its ~6-minute cap, so this installs a time-driven trigger
  * that re-invokes continueBackfill() every 10 minutes until caught up, then
  * removes itself.
  */

@@ -90,15 +90,15 @@ backend/                deploys via Vercel — Python serverless functions + DB 
   - Verifies `SYNC_SECRET`, upserts rows into Neon via
     `psycopg2.extras.execute_values` with
     `ON CONFLICT (sheet_row_id) DO UPDATE`, then batch-embeds (single
-    Voyage AI call per request) any row that came back with a NULL embedding.
+    OpenAI call per request) any row that came back with a NULL embedding.
   - `api/_shared/embeddings.py`, `api/_shared/reports.py`: helper modules.
     Live under a leading-underscore directory so Vercel's Python builder
     doesn't treat them as their own routes.
-  - Env vars: `DATABASE_URL`, `SYNC_SECRET`, `VOYAGE_API_KEY`.
+  - Env vars: `DATABASE_URL`, `SYNC_SECRET`, `OPENAI_API_KEY`.
 
 - **`backend/db/schema.sql`** — run once in Neon's SQL editor. `reports`
   table with `phone` as `TEXT` (not numeric, to keep leading digits/
-  precision), a nullable `description_embedding vector(1024)`, btree
+  precision), a nullable `description_embedding vector(1536)`, btree
   indexes on `state`, `project`, `report_timestamp`. The HNSW index on the
   embedding column is commented out — create it only once embeddings are
   actually populated for most rows, otherwise it just gets rebuilt from
@@ -116,18 +116,21 @@ there's no need to recompute/verify the hash server-side.
 ## Embeddings
 - Generated once per row, only when `description_embedding IS NULL` — never
   re-embeds existing rows.
-- **Voyage AI** (`voyage-4-lite`, 1024-dim, matches the schema column) —
-  Anthropic doesn't have its own embeddings API and recommends Voyage as the
-  embeddings provider to pair with Claude. `input_type="document"` when
-  embedding rows for storage, `input_type="query"` when embedding a search
-  query in `semantic_search_reports` — Voyage tunes vectors differently for
-  each, which improves retrieval quality.
-- Batched: one Voyage call per sync request (or per chunk in a backfill),
+- **OpenAI** (`text-embedding-3-small`, 1536-dim, matches the schema
+  column). Tried Voyage AI first (Anthropic's recommended pairing provider,
+  since Anthropic has no embeddings API of its own) but its free tier caps
+  requests at 3/minute with no payment method — too restrictive for the
+  initial ~7,974-row backfill — so switched to OpenAI, whose default rate
+  limits are much higher. `embed_texts()` still accepts an `input_type`
+  argument for interface compatibility (ignored — OpenAI has no query vs.
+  document distinction), so `semantic_search_reports` didn't need to change
+  if the provider changes again later.
+- Batched: one OpenAI call per sync request (or per chunk in a backfill),
   not one call per row — keeps well inside Vercel's function time limit
   even for a full 200-row `backfillAll()` chunk.
 - `backend/scripts/backfill_embeddings.py` is a separate, local-only
   follow-up job for anything that ends up NULL after the fact (e.g.
-  `VOYAGE_API_KEY` wasn't set yet during the initial load). Loops in chunks
+  `OPENAI_API_KEY` wasn't set yet during the initial load). Loops in chunks
   of 100 until nothing is left to embed. Run with `backend/` as the working
   directory: `python scripts/backfill_embeddings.py`.
 

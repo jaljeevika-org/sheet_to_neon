@@ -11,11 +11,14 @@ in the dashboards named below.
 - Copy the connection string from Neon's "Connection Details" panel — this
   is `DATABASE_URL`, needed in step 3.
 
-## 2. Voyage AI (embeddings)
-- Get an API key from dash.voyageai.com → `VOYAGE_API_KEY`, needed in
-  step 3. (Not OpenAI — Anthropic/Claude has no embeddings API of its own
-  and recommends Voyage as the pairing provider. First 200M tokens/month
-  are free, which comfortably covers this project's data volume.)
+## 2. OpenAI (embeddings)
+- Get an API key from platform.openai.com → `OPENAI_API_KEY`, needed in
+  step 3. Requires a billing-enabled account (Settings → Billing) — cost is
+  tiny, `text-embedding-3-small` is ~$0.02 per 1M tokens.
+  (Voyage AI was tried first — Anthropic's recommended pairing provider,
+  since Claude has no embeddings API of its own — but its free tier caps
+  requests at 3/minute with no payment method, too restrictive for the
+  initial ~7,974-row backfill. OpenAI's default limits are much higher.)
 - Optional: if you'd rather skip semantic search for now, this step can be
   skipped entirely — aggregation reports need no embeddings provider at all.
 
@@ -24,7 +27,7 @@ in the dashboards named below.
 - **Root Directory: `backend`** (this is what makes the monorepo split work).
 - Environment variables (Vercel dashboard → Settings → Environment Variables):
   - `DATABASE_URL` — from step 1
-  - `VOYAGE_API_KEY` — from step 2
+  - `OPENAI_API_KEY` — from step 2
   - `SYNC_SECRET` — any long random string you generate now (e.g.
     `openssl rand -hex 32`). Reuse the exact same value in step 4.
 - Deploy. Copy the resulting URL, e.g. `https://sheet-to-neon.vercel.app`.

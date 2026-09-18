@@ -25,8 +25,8 @@ CREATE TABLE IF NOT EXISTS reports (
     community_outreach      INTEGER,
     attachment_url          TEXT,
 
-    -- Populated lazily (NULL until embedded); voyage-4-lite at 1024 dims.
-    description_embedding   vector(1024),
+    -- Populated lazily (NULL until embedded); text-embedding-3-small is 1536-dim.
+    description_embedding   vector(1536),
 
     synced_at               TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
