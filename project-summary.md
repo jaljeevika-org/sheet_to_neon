@@ -90,11 +90,11 @@ backend/                deploys via Vercel — Python serverless functions + DB 
   - Verifies `SYNC_SECRET`, upserts rows into Neon via
     `psycopg2.extras.execute_values` with
     `ON CONFLICT (sheet_row_id) DO UPDATE`, then batch-embeds (single
-    OpenAI call per request) any row that came back with a NULL embedding.
+    Gemini call per request) any row that came back with a NULL embedding.
   - `api/_shared/embeddings.py`, `api/_shared/reports.py`: helper modules.
     Live under a leading-underscore directory so Vercel's Python builder
     doesn't treat them as their own routes.
-  - Env vars: `DATABASE_URL`, `SYNC_SECRET`, `OPENAI_API_KEY`.
+  - Env vars: `DATABASE_URL`, `SYNC_SECRET`, `GEMINI_API_KEY`.
 
 - **`backend/db/schema.sql`** — run once in Neon's SQL editor. `reports`
   table with `phone` as `TEXT` (not numeric, to keep leading digits/
@@ -116,21 +116,26 @@ there's no need to recompute/verify the hash server-side.
 ## Embeddings
 - Generated once per row, only when `description_embedding IS NULL` — never
   re-embeds existing rows.
-- **OpenAI** (`text-embedding-3-small`, 1536-dim, matches the schema
-  column). Tried Voyage AI first (Anthropic's recommended pairing provider,
-  since Anthropic has no embeddings API of its own) but its free tier caps
-  requests at 3/minute with no payment method — too restrictive for the
-  initial ~7,974-row backfill — so switched to OpenAI, whose default rate
-  limits are much higher. `embed_texts()` still accepts an `input_type`
-  argument for interface compatibility (ignored — OpenAI has no query vs.
-  document distinction), so `semantic_search_reports` didn't need to change
-  if the provider changes again later.
-- Batched: one OpenAI call per sync request (or per chunk in a backfill),
-  not one call per row — keeps well inside Vercel's function time limit
-  even for a full 200-row `backfillAll()` chunk.
+- **Gemini** (`gemini-embedding-001`, output truncated to 1536-dim via the
+  model's Matryoshka support — matches the schema column, so no migration
+  was needed when switching to this provider). Third provider tried:
+  Voyage AI's free tier caps requests at 3/minute with no payment method
+  (too restrictive for the ~7,974-row backfill); the OpenAI account on hand
+  had zero billing credits. `embed_texts()`'s `input_type` maps to Gemini's
+  `task_type` (`RETRIEVAL_DOCUMENT` for storage, `RETRIEVAL_QUERY` for
+  search queries in `semantic_search_reports`).
+- Gemini only auto-normalizes its native 3072-dim output — at a truncated
+  dimension like 1536, `embeddings.py` manually L2-normalizes each vector
+  (`_normalize()`), otherwise cosine-distance comparisons in
+  `semantic_search_reports` would be subtly wrong.
+- `embed_texts()` chunks internally to 100 texts per API call with
+  retry-on-429 backoff (Gemini's free-tier RPM/TPM for this model aren't
+  published as fixed numbers, so this paces conservatively rather than
+  guessing) — callers (`sync.py`, the backfill script) don't need to know
+  about this, they just call `embed_texts(list_of_strings)`.
 - `backend/scripts/backfill_embeddings.py` is a separate, local-only
   follow-up job for anything that ends up NULL after the fact (e.g.
-  `OPENAI_API_KEY` wasn't set yet during the initial load). Loops in chunks
+  `GEMINI_API_KEY` wasn't set yet during the initial load). Loops in chunks
   of 100 until nothing is left to embed. Run with `backend/` as the working
   directory: `python scripts/backfill_embeddings.py`.
 

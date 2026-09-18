@@ -11,14 +11,15 @@ in the dashboards named below.
 - Copy the connection string from Neon's "Connection Details" panel — this
   is `DATABASE_URL`, needed in step 3.
 
-## 2. OpenAI (embeddings)
-- Get an API key from platform.openai.com → `OPENAI_API_KEY`, needed in
-  step 3. Requires a billing-enabled account (Settings → Billing) — cost is
-  tiny, `text-embedding-3-small` is ~$0.02 per 1M tokens.
-  (Voyage AI was tried first — Anthropic's recommended pairing provider,
-  since Claude has no embeddings API of its own — but its free tier caps
+## 2. Gemini (embeddings)
+- Get an API key from aistudio.google.com/apikey → `GEMINI_API_KEY`, needed
+  in step 3.
+  (Two other providers were tried first: Voyage AI's free tier caps
   requests at 3/minute with no payment method, too restrictive for the
-  initial ~7,974-row backfill. OpenAI's default limits are much higher.)
+  initial ~7,974-row backfill; the OpenAI account on hand had zero billing
+  credits. Gemini's free tier has more headroom, and `embed_texts()`
+  chunks + retries defensively since the exact free-tier limits for this
+  model aren't published as fixed numbers.)
 - Optional: if you'd rather skip semantic search for now, this step can be
   skipped entirely — aggregation reports need no embeddings provider at all.
 
@@ -27,7 +28,7 @@ in the dashboards named below.
 - **Root Directory: `backend`** (this is what makes the monorepo split work).
 - Environment variables (Vercel dashboard → Settings → Environment Variables):
   - `DATABASE_URL` — from step 1
-  - `OPENAI_API_KEY` — from step 2
+  - `GEMINI_API_KEY` — from step 2
   - `SYNC_SECRET` — any long random string you generate now (e.g.
     `openssl rand -hex 32`). Reuse the exact same value in step 4.
 - Deploy. Copy the resulting URL, e.g. `https://sheet-to-neon.vercel.app`.
