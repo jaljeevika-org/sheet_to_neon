@@ -19,13 +19,18 @@ CREATE TABLE IF NOT EXISTS reports (
     project                 TEXT,
     area_of_intervention    TEXT,
     description             TEXT,
-    beneficiaries           INTEGER,
-    project_beneficiaries   INTEGER,
-    training_participants   INTEGER,
-    community_outreach      INTEGER,
+    -- BIGINT, not INTEGER: real field data has produced out-of-range values
+    -- in these columns (e.g. a misplaced phone number), which crashed
+    -- inserts under INTEGER's ~2.1 billion cap. Apps Script also rejects
+    -- obviously-bogus values before sending, but the wider type is a
+    -- backstop against whatever else messy sheet data throws at it.
+    beneficiaries           BIGINT,
+    project_beneficiaries   BIGINT,
+    training_participants   BIGINT,
+    community_outreach      BIGINT,
     attachment_url          TEXT,
 
-    -- Populated lazily (NULL until embedded); text-embedding-3-small is 1536-dim.
+    -- Populated lazily (NULL until embedded); gemini-embedding-001 truncated to 1536-dim.
     description_embedding   vector(1536),
 
     synced_at               TIMESTAMPTZ NOT NULL DEFAULT now(),

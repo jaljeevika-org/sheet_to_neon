@@ -158,10 +158,17 @@ function computeSheetRowId_(timestamp, phone) {
   }).join('');
 }
 
+// These columns are per-report counts (beneficiaries, participants, etc.) --
+// anything above this is almost certainly bad data (e.g. a phone number or
+// timestamp landing in the wrong column), not a real count.
+var MAX_REASONABLE_COUNT = 1000000;
+
 function toNumberOrNull_(v) {
   if (v === '' || v === null || v === undefined) return null;
   var n = Number(v);
-  return isNaN(n) ? null : n;
+  if (isNaN(n) || !isFinite(n)) return null;
+  if (Math.abs(n) > MAX_REASONABLE_COUNT) return null;
+  return n;
 }
 
 function sendBatch_(rows) {
