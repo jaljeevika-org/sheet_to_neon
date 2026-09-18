@@ -11,7 +11,7 @@
  */
 
 var SHEET_NAME = 'Daily Reports';
-var SYNC_ENDPOINT = 'https://YOUR-VERCEL-APP.vercel.app/api/sync';
+var SYNC_ENDPOINT = 'https://backend-g1-3c69.vercel.app/api/sync';
 var SYNC_SECRET_PROPERTY = 'SYNC_SECRET';
 var LAST_SYNCED_ROW_PROPERTY = 'lastSyncedRow';
 var BATCH_SIZE = 200; // rows per HTTP request
