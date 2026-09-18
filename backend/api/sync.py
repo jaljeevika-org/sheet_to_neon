@@ -19,7 +19,7 @@ UPSERT_SQL = """
 INSERT INTO reports (
     sheet_row_id, report_timestamp, name, phone, state, location, project,
     area_of_intervention, description, beneficiaries, project_beneficiaries,
-    training_participants, community_outreach, attachment_url, updated_at
+    training_participants, community_outreach, attachment_url
 ) VALUES %s
 ON CONFLICT (sheet_row_id) DO UPDATE SET
     report_timestamp = EXCLUDED.report_timestamp,
